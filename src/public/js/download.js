@@ -20,17 +20,37 @@ function updateStatus(isLoading) {
 }
 
 function downloadMergedFile(url){
-    url = JSON.parse(url);
+    // Parse the URL object once
+    const urlObj = JSON.parse(url);
     updateStatus(true);
     
-    axios.post("/download/merged", {url: url})
-        .then(() => {
-            updateStatus(false);
-        })
-        .catch(error => {
-            console.log(error);
-            updateStatus(false);
-        });
+    // Create a hidden iframe to handle the download
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+    
+    // Submit a form to trigger the download
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/download/merged';
+    form.target = iframe.name;
+    
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'files';
+    // Send the files array directly since urlObj is already parsed
+    input.value = JSON.stringify(urlObj.files);
+    
+    form.appendChild(input);
+    document.body.appendChild(form);
+    form.submit();
+    
+    // Clean up
+    setTimeout(() => {
+        document.body.removeChild(form);
+        document.body.removeChild(iframe);
+        updateStatus(false);
+    }, 2000);
 }
 
 function downloadSeparatedFile(url){

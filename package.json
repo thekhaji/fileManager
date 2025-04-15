@@ -1,25 +1,30 @@
 {
-  "name": "file-manager",
+  "name": "filemanager",
   "version": "1.0.0",
-  "description": "File management system",
-  "main": "src/app.js",
+  "description": "This is a project to manage files from different routes and convert them to pdf",
   "type": "module",
+  "main": "src/server.js",
   "scripts": {
-    "start": "node src/app.js",
-    "dev": "nodemon src/app.js"
+    "start": "nodemon src/server.js",
+    "start:dev": "nodemon src/server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "author": "thekhaji",
+  "license": "ISC",
   "dependencies": {
-    "axios": "^1.6.7",
-    "cheerio": "^1.0.0-rc.12",
-    "express": "^4.18.2",
-    "libreoffice-convert": "^1.4.1",
     "archiver": "^7.0.1",
-    "tmp": "^0.2.1",
-    "puppeteer": "^21.11.0",
-    "pdf-merger-js": "^4.1.2",
-    "pdf-lib": "^1.17.1"
+    "axios": "^1.8.4",
+    "body-parser": "^2.2.0",
+    "cheerio": "^1.0.0",
+    "ejs": "^3.1.10",
+    "express": "^5.1.0",
+    "fs-extra": "^11.3.0",
+    "libreoffice-convert": "^1.0.0",
+    "pdf-lib": "^1.17.1",
+    "puppeteer": "^24.6.1",
+    "tmp": "^0.2.3"
   },
   "devDependencies": {
-    "nodemon": "^3.0.3"
+    "nodemon": "^3.1.9"
   }
 }

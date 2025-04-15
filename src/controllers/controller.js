@@ -26,9 +26,30 @@ controller.getFiles = async (req, res) =>{
     }
 }
 
-controller.downloadMergedFile = (req, res) => {
-    console.log("req.url:", req.body);
-    res.send("Downloading merged file");
+controller.downloadMergedFile = async (req, res) => {
+    try {
+        console.log("Downloading merged file");
+        console.log("req.url:", req.body);
+
+        let files;
+        try {
+            files = JSON.parse(req.body.files);
+        } catch (e) {
+            throw new Error("Invalid files data format");
+        }
+        console.log("Request files:", files);
+
+        if (!files || !Array.isArray(files)) {
+            throw new Error("Invalid request: files array is required");
+        }
+
+
+        await serviceModel.mergedDownload({ files }, res);
+
+    } catch (error) {
+        console.log("Error, while downloading:", error);
+        res.send("Error while downloading from provided links");
+    }
 }
 
 controller.downloadSeparatedFile = async(req, res) => {

@@ -6,6 +6,7 @@ import archiver from "archiver";
 import fs from "fs";
 import tmp from "tmp";
 import puppeteer from "puppeteer";
+import { PDFDocument } from "pdf-lib";
 
 class ServiceModel {
     constructor() {
@@ -169,8 +170,63 @@ class ServiceModel {
         }
     }
 
-    async mergedDownload(url) {
-        // Reserved for future functionality
+    async mergedDownload(urlObj, res) {
+        try {
+            console.log("Starting merged download for URL:", urlObj.files);
+
+            if (!urlObj.files || !Array.isArray(urlObj.files)) {
+                throw new Error("Invalid URL object: files array is required");
+            }
+
+            const files = await this.downloadFile(urlObj.files);
+            const convertPromises = files.map(file => new Promise((resolve, reject) => {
+                libre.convert(file.buffer, '.pdf', undefined, (err, done) => {
+                    if (err) reject(err);
+                    else resolve(done);
+                });
+            }));
+
+            const pdfBuffers = await Promise.all(convertPromises);
+
+            const mergedPdf = await PDFDocument.create();
+
+            for (let i = 0; i < pdfBuffers.length; i++) {
+                const pdf = await PDFDocument.load(pdfBuffers[i]);
+                const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+                copiedPages.forEach(page => mergedPdf.addPage(page));
+
+                // 👉 Add blank separator page *after* each file, except the last one
+                if (i < pdfBuffers.length - 1) {
+                    const blankPage = mergedPdf.addPage();
+                    const { width, height } = blankPage.getSize();
+                    blankPage.drawText('--- End of Document ---', {
+                        x: width / 2 - 100,
+                        y: height / 2,
+                        size: 18,
+                    });
+                }
+            }
+
+            const finalPdf = await mergedPdf.save();
+
+            console.log("merged pdf created:", finalPdf);
+            
+            res.setHeader('Content-Type', 'application/zip');
+            res.setHeader('Content-Disposition', 'attachment; filename=download.zip');
+
+            const archive = archiver('zip', { zlib: { level: 9 } });
+
+            archive.pipe(res);
+            archive.append(Buffer.from(finalPdf), { name: 'merged.pdf' });
+            await archive.finalize();
+            console.log("Download mergedPDF file zip finalized.");
+
+        } catch (error) {
+            console.error("Error in separateDownload:", error);
+            if (!res.headersSent) {
+                res.status(500).json({ error: error.message });
+            }
+        }
     }
 }
 
