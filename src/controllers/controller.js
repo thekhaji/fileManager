@@ -18,13 +18,22 @@ controller.getFiles = async (req, res) =>{
         console.log("Download Page");
         const links = req.query.link;
         const result = await serviceModel.getFiles(links);
-        console.log("result:", result);
         
-        res.json({status: "OK"});
+        res.render("download", {results: result});
     } catch (error) {
         console.log("Error, while downloading:", error);
         res.send("Error while downloading from provided links");
     }
+}
+
+controller.downloadMergedFile = (req, res) => {
+    console.log("Downloading merged file");
+    res.send("Downloading merged file");
+}
+
+controller.downloadSeparatedFile = (req, res) => {
+    console.log("Downloading separated file");
+    res.send("Downloading separated file");
 }
 
 

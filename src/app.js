@@ -21,5 +21,7 @@ app.set('view engine', 'ejs');
 // Routes
 app.get("/", controller.getMainPage);
 app.get("/download", controller.getFiles);
+app.post("/download/merged", controller.downloadMergedFile);
+app.post("/download/separated", controller.downloadSeparatedFile);
 
 export default app;

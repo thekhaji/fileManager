@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/css/download.css">
+    <title>Document</title>
+</head>
+<body>
+    <div class="tableContainer">
+        <table>
+            <thead>
+                <th>No</th>
+                <th>URL</th>
+                <th>Files</th>
+                <th>Download Options</th>
+            </thead>
+            <tbody>
+                <% for (let i = 0; i < results.length; i++) { %>
+                <tr>
+                    <td><%= i + 1 %></td>
+                    <td><%= results[i].url %></td>
+                    <%if (results[i].found) { %>
+                        <td>
+                            <ul>
+                                <% results[i].files.forEach(file => { %>
+                                    <li><%= file.split('/').pop() %></li>
+                                <% }); %>
+                            </ul>
+                        </td>
+                        <td>
+                            <button onclick="downloadMergedFile('<%= results[i] %>')">Merged Version</button>
+                            <button onclick="downloadSeparatedFile('<%= results[i] %>')">Separated Version</button>
+                        </td>
+                    <% } else { %>
+                        <td>No files found</td>
+                        <td></td>
+                    <% } %>
+                </tr>
+                <% }; %>
+            </tbody>
+        </table>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="/js/download.js"></script>
+</body>
+</html>
