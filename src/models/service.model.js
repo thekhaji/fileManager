@@ -1,105 +1,177 @@
 import * as cheerio from "cheerio";
 import axios from "axios";
 import url from "url";
-
+import libre from "libreoffice-convert";
+import archiver from "archiver";
+import fs from "fs";
+import tmp from "tmp";
+import puppeteer from "puppeteer";
 
 class ServiceModel {
-    constructor (){
+    constructor() {
         this.fileExtensions = [".pdf", ".ppt", ".pptx", ".doc", ".hwp", ".hwpx", ".xls", ".xlsx", ".zip"];
     }
 
-    async getFiles(links){
-        try {
-            if (!links) {
-                throw new Error("No links provided");
-            }
+    async getFiles(links) {
+        if (!links) throw new Error("No links provided");
 
-            const results = [];
-            
-            if(Array.isArray(links)){
-                // Use Promise.all to wait for all async operations
-                const promises = links.map(link => this.checkForFileTypes(link));
-                const linkResults = await Promise.all(promises);
-                results.push(...linkResults);
-            } else {
-                const result = await this.checkForFileTypes(links);
-                results.push(result);
-            }
-            
-            return results;
-        } catch (error) {
-            console.error("Error in getFiles:", error);
-            throw error;
-        }
+        const results = [];
+
+        const urls = Array.isArray(links) ? links : [links];
+        const linkResults = await Promise.all(urls.map(link => this.checkForFileTypes(link)));
+        results.push(...linkResults);
+
+        return results;
     }
 
     async checkForFileTypes(targetUrl) {
+        if (!targetUrl || typeof targetUrl !== "string") throw new Error("Invalid URL provided");
+
         try {
-            if (!targetUrl || typeof targetUrl !== 'string') {
-                throw new Error("Invalid URL provided");
-            }
+            new URL(targetUrl);
+        } catch {
+            throw new Error("Invalid URL format");
+        }
 
-            // Validate URL format
-            try {
-                new URL(targetUrl);
-            } catch (e) {
-                throw new Error("Invalid URL format");
-            }
+        const staticResult = await this.fetchStaticContent(targetUrl);
 
-            // Get HTML content with timeout
+        if (!staticResult.found) {
+            console.log("No files found in static HTML. Trying Puppeteer for dynamic content.");
+            return await this.fetchDynamicContent(targetUrl);
+        }
+
+        return staticResult;
+    }
+
+    async fetchStaticContent(targetUrl) {
+        try {
             const response = await axios.get(targetUrl, {
-                timeout: 10000, // 10 second timeout
-                validateStatus: function (status) {
-                    return status >= 200 && status < 300; // Only accept 2xx status codes
-                }
+                timeout: 10000,
+                maxRedirects: 5,
+                validateStatus: status => status >= 200 && status < 300
             });
-            
-            const html = response.data;
-            
-            // Parse HTML
-            const $ = cheerio.load(html);
-            
-            // Extract all links
+
+            const $ = cheerio.load(response.data);
             const links = [];
-            $('a').each((index, element) => {
-                const href = $(element).attr('href');
-                if (href) {
-                    try {
-                        // Convert relative URLs to absolute
-                        const absoluteUrl = url.resolve(targetUrl, href);
-                        links.push(absoluteUrl);
-                    } catch (e) {
-                        console.warn(`Failed to resolve URL: ${href}`);
-                    }
+
+            $('a[href], a[src], a[data-href]').each((_, el) => {
+                const href = $(el).attr('href') || $(el).attr('src') || $(el).attr('data-href');
+                if (href && this.fileExtensions.some(ext => href.toLowerCase().endsWith(ext))) {
+                    links.push(url.resolve(targetUrl, href));
                 }
             });
-            
-            // Filter links by file extension
-            const matchingFiles = links.filter(link => {
-                return this.fileExtensions.some(ext => 
-                    link.toLowerCase().endsWith(ext.toLowerCase())
-                );
-            });
-            
-            return {
-                url: targetUrl,
-                found: matchingFiles.length > 0,
-                files: matchingFiles
-            };
-            
+
+            console.log("Static content files found:", links);
+            return { url: targetUrl, found: links.length > 0, files: links };
         } catch (error) {
-            console.error('Error checking URL for files:', error.message);
-            return {
-                url: targetUrl,
-                found: false,
-                files: [],
-                error: error.message
-            };
+            console.error("Error fetching static content:", error.message);
+            return { url: targetUrl, found: false, files: [], error: error.message };
         }
     }
-      
 
-    
+    async fetchDynamicContent(targetUrl) {
+        try {
+            const browser = await puppeteer.launch({
+                headless: true,
+                args: ['--no-sandbox', '--disable-setuid-sandbox']
+            });
+
+            const page = await browser.newPage();
+            await page.goto(targetUrl, { waitUntil: 'networkidle2' });
+
+            // Wait for elements likely to contain download links
+            await page.waitForSelector('a[href], a[src], a[data-href]', { timeout: 10000 });
+
+            const html = await page.content();
+            await browser.close();
+
+            const $ = cheerio.load(html);
+            const links = [];
+
+            $('a[href], a[src], a[data-href]').each((_, el) => {
+                const href = $(el).attr('href') || $(el).attr('src') || $(el).attr('data-href');
+                if (href && this.fileExtensions.some(ext => href.toLowerCase().endsWith(ext))) {
+                    links.push(url.resolve(targetUrl, href));
+                }
+            });
+
+            console.log("Dynamic content files found:", links);
+            return { url: targetUrl, found: links.length > 0, files: links };
+        } catch (error) {
+            console.error("Error fetching dynamic content with Puppeteer:", error.message);
+            return { url: targetUrl, found: false, files: [], error: error.message };
+        }
+    }
+
+    async downloadFile(fileUrls) {
+        if (!Array.isArray(fileUrls) || fileUrls.length === 0) {
+            throw new Error("file URLs are required.");
+        }
+
+        const downloadPromises = fileUrls.map(async url => {
+            const response = await axios.get(url, { responseType: 'arraybuffer' });
+            const buffer = Buffer.from(response.data);
+            const originalName = url.split('/').pop();
+            return { buffer, name: originalName };
+        });
+
+        return await Promise.all(downloadPromises);
+    }
+
+    async seperateDownload(urlObj, res) {
+        try {
+            console.log("Starting separate download for URL:", urlObj.files);
+
+            if (!urlObj.files || !Array.isArray(urlObj.files)) {
+                throw new Error("Invalid URL object: files array is required");
+            }
+
+            const files = await this.downloadFile(urlObj.files);
+            let pdfFiles = files.map(file => new Promise((resolve, reject) => {
+                libre.convert(file.buffer, '.pdf', undefined, (err, done) => {
+                    if (err) reject(err);
+                    else {
+                        const pdfName = file.name.replace(/\.[^/.]+$/, '.pdf');
+                        resolve({ name: pdfName, buffer: done });
+                    }
+                });
+            }));
+
+            pdfFiles = await Promise.all(pdfFiles);
+
+            const archive = archiver('zip', { zlib: { level: 9 } });
+
+            archive.on('error', err => {
+                console.error("Archiver error:", err);
+                if (!res.headersSent) {
+                    res.status(500).json({ error: 'Error creating zip file' });
+                }
+            });
+
+            res.setHeader('Content-Type', 'application/zip');
+            res.setHeader('Content-Disposition', 'attachment; filename=download.zip');
+
+            archive.pipe(res);
+
+            for (const file of pdfFiles) {
+                if (file?.name && file?.buffer) {
+                    archive.append(file.buffer, { name: file.name });
+                }
+            }
+
+            await archive.finalize();
+            console.log("Download zip finalized.");
+        } catch (error) {
+            console.error("Error in separateDownload:", error);
+            if (!res.headersSent) {
+                res.status(500).json({ error: error.message });
+            }
+        }
+    }
+
+    async mergedDownload(url) {
+        // Reserved for future functionality
+    }
 }
 
 export default ServiceModel;

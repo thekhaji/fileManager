@@ -8,6 +8,13 @@
 </head>
 <body>
     <div class="tableContainer">
+        <div id="statusContainer" style="display: none;">
+            <div class="status-icon">
+                <div class="spinner"></div>
+                <div class="checkmark" style="display: none;">✓</div>
+            </div>
+            <div class="status-text">Processing...</div>
+        </div>
         <table>
             <thead>
                 <th>No</th>
@@ -29,8 +36,8 @@
                             </ul>
                         </td>
                         <td>
-                            <button onclick="downloadMergedFile('<%= results[i] %>')">Merged Version</button>
-                            <button onclick="downloadSeparatedFile('<%= results[i] %>')">Separated Version</button>
+                            <button onclick="downloadMergedFile('<%= JSON.stringify(results[i]) %>')">Merged Version</button>
+                            <button onclick="downloadSeparatedFile('<%= JSON.stringify(results[i]) %>')">Separated Version</button>
                         </td>
                     <% } else { %>
                         <td>No files found</td>
@@ -43,5 +50,8 @@
     </div>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="/js/download.js"></script>
+    <style>
+        
+    </style>
 </body>
 </html>
