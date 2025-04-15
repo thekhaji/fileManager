@@ -12,10 +12,10 @@ function updateStatus(isLoading) {
     } else {
         spinner.style.display = 'none';
         checkmark.style.display = 'flex';
-        statusText.textContent = 'Downloaded Successfully';
-        setTimeout(() => {
+        statusText.textContent = 'Downloaded Successfully, files will be in your download folder in several seconds';
+        setTimeout(() => { 
             statusContainer.style.display = 'none';
-        }, 2000);
+        }, 15000);
     }
 }
 
